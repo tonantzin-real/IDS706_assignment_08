@@ -2,11 +2,12 @@ import time
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from sqlalchemy import create_engine, text
 
 st.set_page_config(page_title="Real-Time Transactions Dashboard", layout="wide")
-st.title("🏦 Real-Time Bank Transactions Dashboard")
+st.title("🏦 Real-Time Transactions Dashboard")
 
 DATABASE_URL = "postgresql://kafka_user:kafka_password@localhost:5432/kafka_db"
 
@@ -51,6 +52,10 @@ if st.sidebar.button("Refresh now"):
 
 placeholder = st.empty()
 
+# Initialize session state for unique keys
+if "chart_keys" not in st.session_state:
+    st.session_state.chart_keys = {"category": 0, "city": 0, "status": 0}
+
 while True:
     df_transactions = load_data(selected_status, limit=int(limit_records))
 
@@ -71,8 +76,8 @@ while True:
         )
         confirmed = len(df_transactions[df_transactions["status"] == "Confirmed"])
         rejected = len(df_transactions[df_transactions["status"] == "Rejected"])
-        reversed = len(df_transactions[df_transactions["status"] == "Reversed"])
-        approval_rate = (
+        reversed_count = len(df_transactions[df_transactions["status"] == "Reversed"])
+        success_rate = (
             (confirmed / total_transactions * 100) if total_transactions > 0 else 0.0
         )
 
@@ -84,33 +89,91 @@ while True:
         k1.metric("Total Transactions", total_transactions)
         k2.metric("Total Value", f"${total_value:,.2f}")
         k3.metric("Average Value", f"${average_value:,.2f}")
-        k4.metric("Approval Rate", f"{approval_rate:,.2f}%")
-        k5.metric("Rejected/Reversed", rejected + reversed)
+        k4.metric("Success Rate", f"{success_rate:,.2f}%")
+        k5.metric("Rejected/Reversed", rejected + reversed_count)
 
         st.markdown("### Raw Data (Top 10)")
         st.dataframe(df_transactions.head(10), use_container_width=True)
 
-        # Charts
-        grouped_category = (
-            df_transactions.groupby("category")["value"]
-            .sum()
-            .reset_index()
-            .sort_values("value", ascending=False)
-        )
-        fig_category = px.bar(
-            grouped_category, x="category", y="value", title="Value by Category"
-        )
-
-        grouped_city = df_transactions.groupby("city")["value"].sum().reset_index()
-        fig_city = px.pie(
-            grouped_city, values="value", names="city", title="Value by City"
-        )
-
+        # Charts with unique keys
         chart_col1, chart_col2 = st.columns(2)
+
         with chart_col1:
-            st.plotly_chart(fig_category, use_container_width=True)
+            # Value by Category
+            grouped_category = (
+                df_transactions.groupby("category")["value"]
+                .sum()
+                .reset_index()
+                .sort_values("value", ascending=False)
+            )
+            fig_category = px.bar(
+                grouped_category,
+                x="category",
+                y="value",
+                title="Transaction Value by Category",
+                color="category",
+            )
+            st.session_state.chart_keys["category"] += 1
+            st.plotly_chart(
+                fig_category,
+                use_container_width=True,
+                key=f"category_chart_{st.session_state.chart_keys['category']}",
+            )
+
         with chart_col2:
-            st.plotly_chart(fig_city, use_container_width=True)
+            # Value by City
+            grouped_city = df_transactions.groupby("city")["value"].sum().reset_index()
+            fig_city = px.pie(
+                grouped_city,
+                values="value",
+                names="city",
+                title="Transaction Value by City",
+            )
+            st.session_state.chart_keys["city"] += 1
+            st.plotly_chart(
+                fig_city,
+                use_container_width=True,
+                key=f"city_chart_{st.session_state.chart_keys['city']}",
+            )
+
+        # Additional chart: Transactions by Status
+        chart_col3, chart_col4 = st.columns(2)
+
+        with chart_col3:
+            # Transactions by Status
+            status_counts = df_transactions["status"].value_counts().reset_index()
+            status_counts.columns = ["status", "count"]
+            fig_status = px.pie(
+                status_counts,
+                values="count",
+                names="status",
+                title="Transactions by Status",
+            )
+            st.session_state.chart_keys["status"] += 1
+            st.plotly_chart(
+                fig_status,
+                use_container_width=True,
+                key=f"status_chart_{st.session_state.chart_keys['status']}",
+            )
+
+        with chart_col4:
+            # Payment Method Distribution
+            payment_counts = (
+                df_transactions["payment_method"].value_counts().reset_index()
+            )
+            payment_counts.columns = ["payment_method", "count"]
+            fig_payment = px.bar(
+                payment_counts,
+                x="payment_method",
+                y="count",
+                title="Transactions by Payment Method",
+                color="payment_method",
+            )
+            st.plotly_chart(
+                fig_payment,
+                use_container_width=True,
+                key=f"payment_chart_{datetime.now().timestamp()}",
+            )
 
         st.markdown("---")
         st.caption(

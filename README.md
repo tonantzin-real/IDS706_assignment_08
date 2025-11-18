@@ -9,12 +9,18 @@ This project demonstrates a real-time data streaming pipeline for financial tran
 ## Features
 
 **Producer:** Generates synthetic transaction data continuously
+![alt text](img/producer.png)
 
 **Kafka:** Streams transactions in real time
 
 **Consumer:** Persists transactions to PostgreSQL
+![alt text](img/consumer.png)
 
 **Dashboard:** Live visualization of transaction KPIs and trends
+![alt text](img/streamlit2.gif)
+![alt text](img/streamlit1.gif)
+
+
 
 ## Dashboard Highlights
 

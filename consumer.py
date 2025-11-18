@@ -59,7 +59,7 @@ def run_consumer():
                 cur.execute(
                     insert_query,
                     (
-                        data["order_id"],  # same field name coming from the producer
+                        data["order_id"],
                         data["status"],
                         data["category"],
                         data["value"],
