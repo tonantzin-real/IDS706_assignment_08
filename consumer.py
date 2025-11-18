@@ -13,7 +13,7 @@ def run_consumer():
             auto_offset_reset="earliest",
             enable_auto_commit=True,
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-            group_id="orders-consumer-group",
+            group_id="transactions-consumer-group",
         )
         print("[Consumer] ✓ Connected to Kafka successfully!")
 
@@ -31,8 +31,8 @@ def run_consumer():
 
         cur.execute(
             """
-            CREATE TABLE IF NOT EXISTS orders (
-                order_id VARCHAR(50) PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS transactions (
+                transaction_id VARCHAR(50) PRIMARY KEY,
                 status VARCHAR(50),
                 category VARCHAR(50),
                 value NUMERIC(10, 2),
@@ -43,35 +43,35 @@ def run_consumer():
             );
             """
         )
-        print("[Consumer] ✓ Table 'orders' ready.")
+        print("[Consumer] ✓ Table 'transactions' ready.")
         print("[Consumer] 🎧 Listening for messages...\n")
 
         message_count = 0
         for message in consumer:
             try:
-                order_data = message.value
+                data = message.value
 
                 insert_query = """
-                    INSERT INTO orders (order_id, status, category, value, timestamp, city, payment_method, discount)
+                    INSERT INTO transactions (transaction_id, status, category, value, timestamp, city, payment_method, discount)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (order_id) DO NOTHING;
+                    ON CONFLICT (transaction_id) DO NOTHING;
                 """
                 cur.execute(
                     insert_query,
                     (
-                        order_data["order_id"],
-                        order_data["status"],
-                        order_data["category"],
-                        order_data["value"],
-                        order_data["timestamp"],
-                        order_data.get("city", "N/A"),
-                        order_data["payment_method"],
-                        order_data["discount"],
+                        data["order_id"],  # same field name coming from the producer
+                        data["status"],
+                        data["category"],
+                        data["value"],
+                        data["timestamp"],
+                        data.get("city", "N/A"),
+                        data["payment_method"],
+                        data["discount"],
                     ),
                 )
                 message_count += 1
                 print(
-                    f"[Consumer] ✓ #{message_count} Inserted order {order_data['order_id']} | {order_data['category']} | ${order_data['value']} | {order_data['city']}"
+                    f"[Consumer] ✓ #{message_count} Inserted transaction {data['order_id']} | {data['category']} | ${data['value']} | {data['city']}"
                 )
 
             except Exception as e:

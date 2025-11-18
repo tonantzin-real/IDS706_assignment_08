@@ -2,12 +2,11 @@ import time
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 from sqlalchemy import create_engine, text
 
-st.set_page_config(page_title="Real-Time Orders Dashboard", layout="wide")
-st.title("🛒 Real-Time Orders Dashboard")
+st.set_page_config(page_title="Real-Time Transactions Dashboard", layout="wide")
+st.title("🏦 Real-Time Bank Transactions Dashboard")
 
 DATABASE_URL = "postgresql://kafka_user:kafka_password@localhost:5432/kafka_db"
 
@@ -21,12 +20,12 @@ engine = get_engine(DATABASE_URL)
 
 
 def load_data(status_filter: str | None = None, limit: int = 200) -> pd.DataFrame:
-    base_query = "SELECT * FROM orders"
+    base_query = "SELECT * FROM transactions"
     params = {}
     if status_filter and status_filter != "All":
         base_query += " WHERE status = :status"
         params["status"] = status_filter
-    base_query += " ORDER BY order_id DESC LIMIT :limit"
+    base_query += " ORDER BY timestamp DESC LIMIT :limit"
     params["limit"] = limit
 
     try:
@@ -38,7 +37,7 @@ def load_data(status_filter: str | None = None, limit: int = 200) -> pd.DataFram
 
 
 # Sidebar controls
-status_options = ["All", "Processing", "Completed", "Cancelled"]
+status_options = ["All", "Pending", "Confirmed", "Rejected", "Reversed"]
 selected_status = st.sidebar.selectbox("Filter by Status", status_options)
 update_interval = st.sidebar.slider(
     "Update Interval (seconds)", min_value=2, max_value=20, value=5
@@ -53,51 +52,58 @@ if st.sidebar.button("Refresh now"):
 placeholder = st.empty()
 
 while True:
-    df_orders = load_data(selected_status, limit=int(limit_records))
+    df_transactions = load_data(selected_status, limit=int(limit_records))
 
     with placeholder.container():
-        if df_orders.empty:
+        if df_transactions.empty:
             st.warning("No records found. Waiting for data...")
             time.sleep(update_interval)
             continue
 
-        if "timestamp" in df_orders.columns:
-            df_orders["timestamp"] = pd.to_datetime(df_orders["timestamp"])
+        if "timestamp" in df_transactions.columns:
+            df_transactions["timestamp"] = pd.to_datetime(df_transactions["timestamp"])
 
         # KPIs
-        total_orders = len(df_orders)
-        total_value = df_orders["value"].sum()
-        average_ticket = total_value / total_orders if total_orders > 0 else 0.0
-        completed = len(df_orders[df_orders["status"] == "Completed"])
-        cancelled = len(df_orders[df_orders["status"] == "Cancelled"])
-        conversion_rate = (completed / total_orders * 100) if total_orders > 0 else 0.0
+        total_transactions = len(df_transactions)
+        total_value = df_transactions["value"].sum()
+        average_value = (
+            total_value / total_transactions if total_transactions > 0 else 0.0
+        )
+        confirmed = len(df_transactions[df_transactions["status"] == "Confirmed"])
+        rejected = len(df_transactions[df_transactions["status"] == "Rejected"])
+        reversed = len(df_transactions[df_transactions["status"] == "Reversed"])
+        approval_rate = (
+            (confirmed / total_transactions * 100) if total_transactions > 0 else 0.0
+        )
 
-        st.subheader(f"Displaying {total_orders} orders (Filter: {selected_status})")
+        st.subheader(
+            f"Displaying {total_transactions} transactions (Filter: {selected_status})"
+        )
 
         k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("Total Orders", total_orders)
+        k1.metric("Total Transactions", total_transactions)
         k2.metric("Total Value", f"${total_value:,.2f}")
-        k3.metric("Average Ticket", f"${average_ticket:,.2f}")
-        k4.metric("Conversion Rate", f"{conversion_rate:,.2f}%")
-        k5.metric("Cancelled", cancelled)
+        k3.metric("Average Value", f"${average_value:,.2f}")
+        k4.metric("Approval Rate", f"{approval_rate:,.2f}%")
+        k5.metric("Rejected/Reversed", rejected + reversed)
 
         st.markdown("### Raw Data (Top 10)")
-        st.dataframe(df_orders.head(10), use_container_width=True)
+        st.dataframe(df_transactions.head(10), use_container_width=True)
 
         # Charts
         grouped_category = (
-            df_orders.groupby("category")["value"]
+            df_transactions.groupby("category")["value"]
             .sum()
             .reset_index()
             .sort_values("value", ascending=False)
         )
         fig_category = px.bar(
-            grouped_category, x="category", y="value", title="Sales by Category"
+            grouped_category, x="category", y="value", title="Value by Category"
         )
 
-        grouped_city = df_orders.groupby("city")["value"].sum().reset_index()
+        grouped_city = df_transactions.groupby("city")["value"].sum().reset_index()
         fig_city = px.pie(
-            grouped_city, values="value", names="city", title="Sales by City"
+            grouped_city, values="value", names="city", title="Value by City"
         )
 
         chart_col1, chart_col2 = st.columns(2)

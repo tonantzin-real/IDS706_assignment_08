@@ -10,17 +10,17 @@ fake = Faker()
 
 
 def generate_synthetic_order():
-    """Generates synthetic e-commerce order data."""
+    """Generates synthetic bank transaction data."""
     categories = [
-        "Soccer",
-        "Basketball",
-        "Running",
-        "Swimming",
-        "Cycling",
-        "Volleyball",
-        "Tennis",
+        "PIX Transfer",
+        "TED Transfer",
+        "DOC Transfer",
+        "Credit Card Payment",
+        "Loan Payment",
+        "Salary Deposit",
+        "ATM Withdrawal",
     ]
-    statuses = ["Processing", "Completed", "Cancelled"]
+    statuses = ["Pending", "Confirmed", "Rejected", "Reversed"]
     cities = [
         "São Paulo",
         "Rio de Janeiro",
@@ -28,10 +28,16 @@ def generate_synthetic_order():
         "Curitiba",
         "Salvador",
         "Recife",
-        "Fortaleza",
+        "Porto Alegre",
     ]
-    payment_methods = ["Credit Card", "Invoice", "PIX", "Debit Card", "PayPal"]
-    discounts = [0, 0.05, 0.10, 0.15]
+    payment_methods = [
+        "PIX",
+        "Debit Card",
+        "Credit Card",
+        "Bank Transfer",
+        "Cash Withdrawal",
+    ]
+    discounts = [0, 0.01, 0.02]  # represents transaction fee discount %
 
     category = random.choice(categories)
     status = random.choice(statuses)
